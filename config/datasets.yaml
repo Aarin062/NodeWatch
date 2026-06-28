@@ -1,0 +1,57 @@
+# =============================================================================
+# datasets.yaml — per-dataset configuration
+# -----------------------------------------------------------------------------
+# The ETL layer reads these entries to locate raw data, map columns into the
+# canonical schema, and sanity-check class balance.
+#
+# Canonical schema (transfer / bipartite datasets):
+#   nodes_accounts:      account_id, [attributes...]
+#   edges_transactions:  transaction_id, source_account, dest_account, amount,
+#                        timestamp, label, [tx_type, category, alert_type, ...]
+#   The prediction unit is ONE transaction (one edge).
+# =============================================================================
+
+# Root of the downloaded raw datasets (external to the repo; data/ is gitignored).
+raw_root: "C:/Users/Aarin Bhatta/OneDrive/Desktop/Projects/erp datasets"
+
+# Where canonical node/edge files are written (resolved relative to repo root).
+processed_root: "data/processed"
+
+datasets:
+
+  # ---- Tier 1: IBM AML simulation — the decisive topology testbed ----------
+  ibm_aml:
+    kind: transfer                       # account -> account transfers
+    raw:
+      transactions: "erp_fraud_data_4(ibm_aml_sim)/transactions.csv"
+      accounts: "erp_fraud_data_4(ibm_aml_sim)/accounts.csv"   # node attributes
+      alerts: "erp_fraud_data_4(ibm_aml_sim)/alerts.csv"       # fraud typology (eval only)
+    schema:
+      tx_id: TX_ID
+      source: SENDER_ACCOUNT_ID
+      dest: RECEIVER_ACCOUNT_ID
+      amount: TX_AMOUNT
+      timestamp: TIMESTAMP               # integer day counter, 0..199
+      tx_type: TX_TYPE
+      label: IS_FRAUD
+      alert_id: ALERT_ID
+    time_unit: day
+    expected_fraud_rate: 0.0013          # verified by the ETL audit step
+
+  # ---- Tier 1: BankSim — sparse bipartite control --------------------------
+  banksim:
+    kind: bipartite                      # customer -> merchant (no cycles possible)
+    quote_char: "'"                      # raw values are single-quote wrapped
+    raw:
+      transactions: "erp_fraud_data_3(bankSim)/bs140513_032310.csv"
+    schema:
+      source: customer
+      dest: merchant
+      amount: amount
+      timestamp: step                    # integer day counter, 0..179
+      category: category
+      label: fraud
+    time_unit: step
+    expected_fraud_rate: 0.0121
+
+  # ---- Tier 2 / 3 (configured later): sap_wurzburg, paysim, fifar -----------

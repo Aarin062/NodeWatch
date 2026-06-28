@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "self-auditing-ledger"
+version = "0.1.0"
+description = "Two-phase ERP fraud detection: temporal Neo4j Shadow Graph + ML modeling."
+requires-python = ">=3.10"
+dependencies = [
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "scikit-learn>=1.3",
+    "xgboost>=2.0",
+    "lightgbm>=4.0",
+    "neo4j>=5.0",
+    "pyyaml>=6.0",
+    "matplotlib>=3.7",
+    "seaborn>=0.13",
+    "plotly>=5.18",
+]
+
+# Make the modules under src/ (common, etl, graph, topology, features, modeling)
+# importable as top-level packages after `pip install -e .` — no sys.path hacks.
+[tool.setuptools.packages.find]
+where = ["src"]
