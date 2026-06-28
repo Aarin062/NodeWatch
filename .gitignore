@@ -42,3 +42,7 @@ reference/
 
 # --- Claude Code local settings (personal, not shared) ---
 .claude/settings.local.json
+
+# --- Local-only assistant rulebook & working docs (kept local, not in the repo) ---
+CLAUDE.md
+docs/
