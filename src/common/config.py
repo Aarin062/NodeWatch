@@ -33,7 +33,14 @@ def get_dataset(name: str, path: str | Path | None = None) -> dict[str, Any]:
 
     ds = dict(datasets[name])
     raw_root = Path(cfg["raw_root"])
-    ds["raw"] = {key: str(raw_root / rel) for key, rel in ds.get("raw", {}).items()}
+
+    def _abs(rel: Any) -> Any:
+        # A raw entry may be a single path or a list of paths (e.g. ledger runs).
+        if isinstance(rel, (list, tuple)):
+            return [str(raw_root / r) for r in rel]
+        return str(raw_root / rel)
+
+    ds["raw"] = {key: _abs(rel) for key, rel in ds.get("raw", {}).items()}
 
     processed_root = Path(cfg.get("processed_root", "data/processed"))
     if not processed_root.is_absolute():

@@ -54,4 +54,66 @@ datasets:
     time_unit: step
     expected_fraud_rate: 0.0121
 
-  # ---- Tier 2 / 3 (configured later): sap_wurzburg, paysim, fifar -----------
+  # ---- Tier 2: PaySim — mobile-money transfer simulator --------------------
+  # 6.36M transfers over 30 simulated days (step = 1 hour). Accounts are
+  # customers ("C...") and merchants ("M..."); merchants are pure sinks, so the
+  # graph is "mostly bipartite" — denser than BankSim, sparser than IBM AML.
+  # Fraud occurs only in TRANSFER + CASH_OUT (carried via tx_type). The broken
+  # `isFlaggedFraud` column is ignored; `isFraud` is the ground-truth label.
+  paysim:
+    kind: transfer
+    raw:
+      transactions: "erp_fraud_data_5(mobile)/PS_20174392719_1491204439457_log.csv"
+    schema:
+      source: nameOrig
+      dest: nameDest
+      amount: amount
+      timestamp: step                    # integer hour counter, 1..743
+      tx_type: type                      # PAYMENT / TRANSFER / CASH_OUT / ...
+      label: isFraud
+    time_unit: step
+    expected_fraud_rate: 0.0013          # ~8.2k frauds / 6.36M txns
+
+  # ---- Tier 2: SAP Würzburg — the genuine ERP double-entry ledger ----------
+  # Real SAP postings (RBKP/RSEG/BKPF/BSEG joined), German headers. There are NO
+  # source/dest columns — the graph is DERIVED: each line item is one edge from
+  # its document (Belegnummer) to the G/L account it posts to (Hauptbuchkonto).
+  # => Document↔Account BIPARTITE model (kind: erp_ledger). Prediction unit =
+  # one line item. Tiny, dense entity graph (~25 G/L accounts), so the topology
+  # signal is expected to be weak — we report its contribution honestly.
+  #
+  # Data spans 5 independent ERPsim runs (fraud_1..3 carry injected frauds;
+  # normal_1..2 are clean). Timestamps are TIME-ONLY (HH:MM:SS), so the canonical
+  # `timestamp` is synthetic: run_index * 1e6 + seconds-since-midnight. This keeps
+  # each run contiguous and preserves within-run order. `run_id` is carried per
+  # edge — downstream MUST partition by run (no cross-run look-ahead).
+  sap_wurzburg:
+    kind: erp_ledger
+    raw:
+      ledger_files:
+        - "erp_fraud_data_1(wurzburg)/erp_fraud_data/joint_datasets/fraud_1.csv"
+        - "erp_fraud_data_1(wurzburg)/erp_fraud_data/joint_datasets/fraud_2.csv"
+        - "erp_fraud_data_1(wurzburg)/erp_fraud_data/joint_datasets/fraud_3.csv"
+        - "erp_fraud_data_1(wurzburg)/erp_fraud_data/joint_datasets/normal_1.csv"
+        - "erp_fraud_data_1(wurzburg)/erp_fraud_data/joint_datasets/normal_2.csv"
+    schema:
+      document: Belegnummer                # SAP document number (BSEG)
+      position: Position                   # line item within the document
+      account: Hauptbuchkonto              # G/L account (100% filled, ~25 unique)
+      account_type: Kontoart               # S=G/L  K=vendor  D=customer  M=material
+      amount: "Betrag Hauswaehr"           # amount in local currency (100% filled)
+      time: Erfassungsuhrzeit              # HH:MM:SS — within-run order only
+      label: Label                         # multi-class; binary = (Label != NonFraud)
+      tx_type: Transaktionsart             # Invoice / G/L posting / Material receipt...
+      dc_indicator: "Soll/Haben-Kennz_"    # S=debit (Soll), H=credit (Haben)
+      posting_key: Buchungsschluessel      # SAP posting key
+      vendor: Kreditor                     # vendor id where present (~2% of lines)
+    time_unit: synthetic                   # run_index*1e6 + seconds-since-midnight
+    expected_fraud_rate: 0.0012            # 248 fraud lines / 200,629 (ETL-verified)
+
+  # ---- Tier 3: FIFAR — DROPPED from Phase 1 (no graph) ---------------------
+  # FIFAR / BAF is purely tabular application-fraud (34 features: income,
+  # velocities, device_os, ...) with NO counterparty/account structure. There is
+  # nothing to build a Shadow Graph from, so topology cannot be extracted and it
+  # is excluded from Phase 1. (Its real purpose — learning-to-defer to human
+  # experts — is orthogonal to our topology thesis.) Left unconfigured by design.
