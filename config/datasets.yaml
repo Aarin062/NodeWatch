@@ -37,6 +37,9 @@ datasets:
       alert_id: ALERT_ID
     time_unit: day
     expected_fraud_rate: 0.0013          # verified by the ETL audit step
+    topology:
+      window: 7                          # trailing days of history the as-of engine sees
+      max_cycle_len: 6                   # detect cycles up to this many edges
 
   # ---- Tier 1: BankSim — sparse bipartite control --------------------------
   banksim:
@@ -53,6 +56,9 @@ datasets:
       label: fraud
     time_unit: step
     expected_fraud_rate: 0.0121
+    topology:
+      window: 7                          # bipartite control: in_cycle MUST be 0 everywhere
+      max_cycle_len: 6
 
   # ---- Tier 2: PaySim — mobile-money transfer simulator --------------------
   # 6.36M transfers over 30 simulated days (step = 1 hour). Accounts are
@@ -73,6 +79,9 @@ datasets:
       label: isFraud
     time_unit: step
     expected_fraud_rate: 0.0013          # ~8.2k frauds / 6.36M txns
+    topology:
+      window: 24                         # 1 day (step = hour); near-forest, weak topology expected
+      max_cycle_len: 6
 
   # ---- Tier 2: SAP Würzburg — the genuine ERP double-entry ledger ----------
   # Real SAP postings (RBKP/RSEG/BKPF/BSEG joined), German headers. There are NO
@@ -110,6 +119,10 @@ datasets:
       vendor: Kreditor                     # vendor id where present (~2% of lines)
     time_unit: synthetic                   # run_index*1e6 + seconds-since-midnight
     expected_fraud_rate: 0.0012            # 248 fraud lines / 200,629 (ETL-verified)
+    partition_col: run_id                  # topology engine resets per run (no cross-run look-ahead)
+    topology:
+      window: null                         # unbounded WITHIN a run (runs are short, reset each run)
+      max_cycle_len: 6
 
   # ---- Tier 3: FIFAR — DROPPED from Phase 1 (no graph) ---------------------
   # FIFAR / BAF is purely tabular application-fraud (34 features: income,
